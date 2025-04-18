@@ -19,5 +19,5 @@ export async function BootstrapServer(app: Hono) {
   
   app.use(secureHeaders());
 
-  app.route("/discts", appRouter);
+  app.route("/rangrez", appRouter);
 }

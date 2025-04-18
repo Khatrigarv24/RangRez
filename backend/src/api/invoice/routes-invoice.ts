@@ -1,13 +1,13 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
-import { generateOrderInvoice } from './order-invoice-controller';
+import { generateOrderInvoice } from './controller-invoice';
 
-const orderRoutes = new Hono();
+const invoiceRoutes = new Hono();
 
 // Enable CORS
-orderRoutes.use('*', cors());
+invoiceRoutes.use('*', cors());
 
 // Invoice routes
-orderRoutes.get('/:orderId/invoice', generateOrderInvoice);
+invoiceRoutes.get('/:orderId/invoice', generateOrderInvoice);
 
-export { orderRoutes };
+export { invoiceRoutes };

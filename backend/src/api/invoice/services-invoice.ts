@@ -3,6 +3,7 @@ import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { v4 as uuidv4 } from 'uuid';
 import dotenv from 'dotenv';
+import { DynamoDBClient, CreateTableCommand, ListTablesCommand } from '@aws-sdk/client-dynamodb';
 
 dotenv.config();
 
@@ -16,8 +17,21 @@ const s3Client = new S3Client({
   },
 });
 
+// Create DynamoDB client using existing credentials
+const dbClient = new DynamoDBClient({
+  region: process.env.AWS_REGION as string,
+  credentials: {
+    accessKeyId: process.env.AWS_ACCESS_KEY as string,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY as string,
+    sessionToken: process.env.AWS_SESSION_TOKEN as string,
+  },
+});
+
 // S3 bucket name - you should add this to your .env file
 const BUCKET_NAME = process.env.AWS_S3_BUCKET_NAME || 'rangrez-uploads';
+
+// Define the invoices table name
+const INVOICES_TABLE = 'invoices';
 
 // Define invoice data structure
 export interface InvoiceData {
@@ -59,7 +73,7 @@ export async function generateInvoicePDF(invoiceData: InvoiceData): Promise<Uint
   const pdfDoc = await PDFDocument.create();
   
   // Add a page
-  const page = pdfDoc.addPage([595.28, 841.89]); // A4 size
+  let page = pdfDoc.addPage([595.28, 841.89]); // A4 size
   
   // Load fonts
   const helveticaFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
@@ -557,6 +571,63 @@ export async function uploadInvoiceToS3(pdfBytes: Uint8Array, orderId: string): 
     throw new Error('Failed to upload invoice');
   }
 }
+
+/**
+ * Ensure invoices table exists in DynamoDB
+ */
+export async function setupInvoiceTable(): Promise<void> {
+  try {
+    // Check if table already exists
+    const listTables = await dbClient.send(new ListTablesCommand({}));
+    
+    if (listTables.TableNames?.includes(INVOICES_TABLE)) {
+      console.log(`✅ Invoices table '${INVOICES_TABLE}' exists`);
+      return;
+    }
+
+    console.log(`Creating invoices table '${INVOICES_TABLE}'...`);
+    
+    // Create the invoices table
+    await dbClient.send(
+      new CreateTableCommand({
+        TableName: INVOICES_TABLE,
+        KeySchema: [
+          { AttributeName: 'invoiceId', KeyType: 'HASH' }
+        ],
+        AttributeDefinitions: [
+          { AttributeName: 'invoiceId', AttributeType: 'S' },
+          { AttributeName: 'customerId', AttributeType: 'S' }
+        ],
+        GlobalSecondaryIndexes: [
+          {
+            IndexName: 'CustomerIdIndex',
+            KeySchema: [
+              { AttributeName: 'customerId', KeyType: 'HASH' }
+            ],
+            Projection: {
+              ProjectionType: 'ALL'
+            },
+            ProvisionedThroughput: {
+              ReadCapacityUnits: 5,
+              WriteCapacityUnits: 5
+            }
+          }
+        ],
+        ProvisionedThroughput: {
+          ReadCapacityUnits: 5,
+          WriteCapacityUnits: 5,
+        },
+      })
+    );
+    
+    console.log(`✅ Created invoices table '${INVOICES_TABLE}'`);
+  } catch (err) {
+    console.error(`❌ Error ensuring invoices table:`, err);
+  }
+}
+
+// Export the client for use in other functions
+export { dbClient };
 
 // Format date as DD/MM/YYYY
 function formatDate(date: Date): string {

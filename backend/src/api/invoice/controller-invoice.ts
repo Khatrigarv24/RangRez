@@ -1,7 +1,7 @@
 import { Context } from 'hono';
 import { ddbDocClient } from '../products/products-services';
 import { GetCommand } from '@aws-sdk/lib-dynamodb';
-import { generateInvoicePDF, uploadInvoiceToS3, InvoiceData } from './order-invoice-service';
+import { generateInvoicePDF, uploadInvoiceToS3, InvoiceData } from './services-invoice';
 import { getUserById } from '../auth/services-auth';
 
 // Generate and download invoice for an order

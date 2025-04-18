@@ -6,7 +6,7 @@ import { uploadRoutes } from './upload/routes-upload';
 import { authRoutes } from './auth/routes-auth';
 import { checkoutRoutes } from './checkout/routes-checkout'; // Import checkout routes
 import { connectDB } from './products/products-services';
-import { setupInvoiceTable } from './invoice/invoice-services';
+import { setupInvoiceTable } from './invoice/services-invoice';
 import { setupCartTable } from './cart/services-cart';
 import { setupWishlistTable } from './wishlist/services-wishlist';
 import { setupUsersTable } from './auth/services-auth';

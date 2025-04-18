@@ -10,11 +10,11 @@ const authRoutes = new Hono();
 authRoutes.use('*', cors());
 
 // Public routes
-authRoutes.post('/api/auth/register', register);
-authRoutes.post('/api/auth/login', login);
+authRoutes.post('/register', register);
+authRoutes.post('/login', login);
 
 // Protected routes
-authRoutes.get('/api/user/:userId', authenticate, authorizeOwnership, getUserProfile);
-authRoutes.put('/api/user/:userId', authenticate, authorizeOwnership, updateUserProfileHandler);
+authRoutes.get('/user/:userId', authenticate, authorizeOwnership, getUserProfile);
+authRoutes.put('/user/:userId', authenticate, authorizeOwnership, updateUserProfileHandler);
 
 export { authRoutes };

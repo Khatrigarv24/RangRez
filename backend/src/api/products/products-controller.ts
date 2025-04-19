@@ -1,34 +1,16 @@
 import { Context } from 'hono';
 import { 
-  DynamoDBClient, 
-  DynamoDBClientConfig 
-} from '@aws-sdk/client-dynamodb';
-import { 
-  DynamoDBDocumentClient, 
-  GetCommand, 
-  PutCommand, 
-  DeleteCommand, 
-  UpdateCommand,
-  ScanCommand,
-  QueryCommand 
+  DynamoDBDocumentClient,
+  GetCommand,
+  ScanCommand
 } from '@aws-sdk/lib-dynamodb';
-import { v4 as uuidv4 } from 'uuid';
+import { ddbDocClient } from './products-services';
 
-// AWS Configuration
-const config: DynamoDBClientConfig = {
-  region: process.env.AWS_REGION || 'ap-south-1',
-  credentials: {
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID || '',
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || ''
-  }
-};
-
-const client = new DynamoDBClient(config);
-const ddbDocClient = DynamoDBDocumentClient.from(client);
+// Use the shared ddbDocClient from products-services
 const tableName = 'products';
 
 /**
- * Get products with filtering and sorting capabilities
+ * Get products with filtering and sorting capabilities (public user access)
  * Supports filters: color, fabric, minPrice, maxPrice
  * Supports sorting: price_asc, price_desc, createdAt_desc, etc.
  */
@@ -41,8 +23,6 @@ export const getProducts = async (c: Context) => {
     const maxPrice = c.req.query('maxPrice') ? parseFloat(c.req.query('maxPrice')) : undefined;
     const sort = c.req.query('sort') || 'createdAt_desc'; // Default sorting
 
-    console.log(`Fetching products with filters - color: ${color}, fabric: ${fabric}, price range: ${minPrice}-${maxPrice}, sort: ${sort}`);
-    
     // Build filter expressions for DynamoDB scan
     let filterExpressions = [];
     let expressionAttributeNames = {};
@@ -100,7 +80,7 @@ export const getProducts = async (c: Context) => {
       });
     }
     
-    // Format response with expected fields
+    // Format response with expected fields - only expose public fields
     const products = Items.map(item => ({
       id: item.id || item.productId || '',
       name: item.name || '',
@@ -108,7 +88,10 @@ export const getProducts = async (c: Context) => {
       color: item.color || '',
       price: item.price || 0,
       stock: item.stock || 0,
-      imageUrl: item.imageUrl || '',
+      imageUrl: item.imageUrl || item.imageUrls?.[0] || '',
+      imageUrls: item.imageUrls || [],
+      tags: item.tags || [],
+      description: item.description || '',
       createdAt: item.createdAt || new Date().toISOString()
     }));
     
@@ -131,7 +114,8 @@ export const getProducts = async (c: Context) => {
     
     return c.json({ 
       success: true, 
-      products
+      products,
+      count: products.length
     });
   } catch (error) {
     console.error("❌ Error fetching products:", error);
@@ -144,7 +128,7 @@ export const getProducts = async (c: Context) => {
 };
 
 /**
- * Get a single product by ID
+ * Get a single product by ID (public user access)
  */
 export const getProductById = async (c: Context) => {
   try {
@@ -164,16 +148,20 @@ export const getProductById = async (c: Context) => {
       }, 404);
     }
     
+    // Format response with public fields only
     return c.json({
       success: true,
       product: {
         id: Item.id || Item.productId,
         name: Item.name || '',
+        description: Item.description || '',
         fabric: Item.fabric || '',
         color: Item.color || '',
         price: Item.price || 0,
         stock: Item.stock || 0,
-        imageUrl: Item.imageUrl || '',
+        imageUrl: Item.imageUrl || Item.imageUrls?.[0] || '',
+        imageUrls: Item.imageUrls || [],
+        tags: Item.tags || [],
         createdAt: Item.createdAt || ''
       }
     });
@@ -182,163 +170,6 @@ export const getProductById = async (c: Context) => {
     return c.json({ 
       success: false, 
       error: "Error retrieving product", 
-      details: error.message 
-    }, 500);
-  }
-};
-
-/**
- * Create a new product
- */
-export const createProduct = async (c: Context) => {
-  try {
-    const body = await c.req.json();
-    
-    // Validate required fields
-    if (!body.name || !body.price) {
-      return c.json({ 
-        success: false, 
-        error: "Missing required fields: name and price are required" 
-      }, 400);
-    }
-    
-    const productId = uuidv4();
-    const timestamp = new Date().toISOString();
-    
-    const product = {
-      id: productId,
-      name: body.name,
-      fabric: body.fabric || '',
-      color: body.color || '',
-      price: parseFloat(body.price),
-      stock: body.stock || 0,
-      imageUrl: body.imageUrl || '',
-      createdAt: timestamp,
-      updatedAt: timestamp
-    };
-    
-    await ddbDocClient.send(new PutCommand({
-      TableName: tableName,
-      Item: product
-    }));
-    
-    return c.json({
-      success: true,
-      message: "Product created successfully",
-      product
-    });
-  } catch (error) {
-    console.error("❌ Error creating product:", error);
-    return c.json({ 
-      success: false, 
-      error: "Error creating product", 
-      details: error.message 
-    }, 500);
-  }
-};
-
-/**
- * Update an existing product
- */
-export const updateProduct = async (c: Context) => {
-  try {
-    const productId = c.req.param('id');
-    const body = await c.req.json();
-    
-    // Build update expression dynamically based on provided fields
-    let updateExpression = "set updatedAt = :updatedAt";
-    const expressionAttributeValues: any = {
-      ":updatedAt": new Date().toISOString()
-    };
-    
-    // Add fields to update expression if they exist in the request
-    if (body.name) {
-      updateExpression += ", #name = :name";
-      expressionAttributeValues[":name"] = body.name;
-    }
-    
-    if (body.fabric !== undefined) {
-      updateExpression += ", fabric = :fabric";
-      expressionAttributeValues[":fabric"] = body.fabric;
-    }
-    
-    if (body.color !== undefined) {
-      updateExpression += ", color = :color";
-      expressionAttributeValues[":color"] = body.color;
-    }
-    
-    if (body.price !== undefined) {
-      updateExpression += ", price = :price";
-      expressionAttributeValues[":price"] = parseFloat(body.price);
-    }
-    
-    if (body.stock !== undefined) {
-      updateExpression += ", stock = :stock";
-      expressionAttributeValues[":stock"] = body.stock;
-    }
-    
-    if (body.imageUrl !== undefined) {
-      updateExpression += ", imageUrl = :imageUrl";
-      expressionAttributeValues[":imageUrl"] = body.imageUrl;
-    }
-    
-    const params = {
-      TableName: tableName,
-      Key: { id: productId },
-      UpdateExpression: updateExpression,
-      ExpressionAttributeValues: expressionAttributeValues,
-      ExpressionAttributeNames: body.name ? { "#name": "name" } : undefined,
-      ReturnValues: "ALL_NEW" as const // Fix the type issue by using 'as const'
-    };
-    
-    const { Attributes } = await ddbDocClient.send(new UpdateCommand(params));
-    
-    if (!Attributes) {
-      return c.json({ 
-        success: false, 
-        error: "Product not found" 
-      }, 404);
-    }
-    
-    return c.json({
-      success: true,
-      message: "Product updated successfully",
-      product: Attributes
-    });
-  } catch (error) {
-    console.error("❌ Error updating product:", error);
-    return c.json({ 
-      success: false, 
-      error: "Error updating product", 
-      details: error.message 
-    }, 500);
-  }
-};
-
-/**
- * Delete a product
- */
-export const deleteProduct = async (c: Context) => {
-  try {
-    const productId = c.req.param('id');
-    
-    const params = {
-      TableName: tableName,
-      Key: { id: productId }
-    };
-    
-    await ddbDocClient.send(new DeleteCommand(params));
-    
-    return c.json({
-      success: true,
-      message: "Product deleted successfully",
-      id: productId
-    });
-  } catch (error) {
-    console.error("❌ Error deleting product:", error);
-    return c.json({ 
-      success: false, 
-      error: "Error deleting product", 
       details: error.message 
     }, 500);
   }

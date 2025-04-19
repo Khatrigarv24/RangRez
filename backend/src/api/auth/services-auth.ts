@@ -39,7 +39,7 @@ export async function setupUsersTable(): Promise<void> {
 
     console.log(`Creating users table '${USERS_TABLE}'...`);
     
-    // Create the users table
+    // Create the users table with additional fields
     await dbClient.send(
       new CreateTableCommand({
         TableName: USERS_TABLE,
@@ -95,13 +95,21 @@ export async function setupUsersTable(): Promise<void> {
 // Interface for user details
 export interface User {
   userId: string;
-  name?: string;      // Adding name field
+  name?: string;
   email: string;
   mobile: string;
-  address?: string;   // Adding address field
+  address?: string;
   gstNumber?: string;
   passwordHash: string;
   createdAt: string;
+  updatedAt?: string;
+  isB2B?: boolean;    // New field
+  isBlocked?: boolean; // New field
+  notes?: string;      // New field for admin notes
+  adminComments?: string; // New field
+  lastLogin?: string;  // Track last login date
+  orderCount?: number; // Track number of orders
+  updatedBy?: string;  // Track who updated the record
 }
 
 // Check if user exists by email
@@ -203,6 +211,11 @@ export async function loginUser(emailOrMobile: string, password: string): Promis
       return null;
     }
     
+    // Check if user is blocked
+    if (user.isBlocked) {
+      throw new Error('Account is blocked. Please contact customer support.');
+    }
+    
     // Verify password
     const isValidPassword = await bcrypt.compare(password, user.passwordHash);
     
@@ -210,12 +223,31 @@ export async function loginUser(emailOrMobile: string, password: string): Promis
       return null;
     }
     
+    // Update last login time
+    try {
+      await ddbDocClient.send(
+        new UpdateCommand({
+          TableName: USERS_TABLE,
+          Key: { userId: user.userId },
+          UpdateExpression: 'set lastLogin = :lastLogin',
+          ExpressionAttributeValues: {
+            ':lastLogin': new Date().toISOString()
+          }
+        })
+      );
+    } catch (updateError) {
+      console.error('Error updating last login time:', updateError);
+      // Continue even if updating last login fails
+    }
+    
     // Generate JWT token
     const token = jwt.sign(
       { 
         userId: user.userId,
         email: user.email,
-        mobile: user.mobile
+        mobile: user.mobile,
+        isB2B: user.isB2B || false,
+        isBlocked: user.isBlocked || false
       },
       JWT_SECRET,
       { expiresIn: JWT_EXPIRES_IN }
@@ -229,7 +261,7 @@ export async function loginUser(emailOrMobile: string, password: string): Promis
     };
   } catch (error) {
     console.error("❌ Error during login:", error);
-    return null;
+    throw error;
   }
 }
 

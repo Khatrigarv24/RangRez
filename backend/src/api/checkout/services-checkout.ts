@@ -72,6 +72,13 @@ export interface OrderItem {
   imageUrl?: string;
 }
 
+export interface StatusHistoryEntry {
+  status: string;
+  timestamp: string;
+  updatedBy?: string;
+  notes?: string;
+}
+
 export interface Order {
   orderId: string;
   userId: string;
@@ -86,11 +93,20 @@ export interface Order {
     postalCode?: string;
     country?: string;
   };
-  paymentStatus: 'pending' | 'paid' | 'failed';
+  paymentStatus: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled' | 'failed';
   paymentMethod?: string;
   paymentId?: string;
   createdAt: string;
   updatedAt?: string;
+  trackingInfo?: {
+    provider?: string;
+    trackingNumber?: string;
+    trackingUrl?: string;
+    estimatedDelivery?: string;
+  };
+  adminNotes?: string;
+  updatedBy?: string;
+  statusHistory?: StatusHistoryEntry[];
 }
 
 // Validate cart and calculate totals
@@ -232,7 +248,15 @@ export async function createOrder(
     total,
     shippingAddress,
     paymentStatus: 'pending',
-    createdAt: timestamp
+    createdAt: timestamp,
+    statusHistory: [
+      {
+        status: 'pending',
+        timestamp,
+        updatedBy: 'system',
+        notes: 'Order created'
+      }
+    ]
   };
   
   // Save order to DynamoDB
@@ -320,22 +344,39 @@ export async function getOrdersByUserId(userId: string): Promise<Order[]> {
 // Update order payment status
 export async function updateOrderPaymentStatus(
   orderId: string, 
-  paymentStatus: 'pending' | 'paid' | 'failed',
+  paymentStatus: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled' | 'failed',
   paymentId?: string,
   paymentMethod?: string
 ): Promise<Order | null> {
   try {
+    // Get current order to access its status history
+    const currentOrder = await getOrderById(orderId);
+    if (!currentOrder) {
+      console.error(`Order ${orderId} not found`);
+      return null;
+    }
+    
     const timestamp = new Date().toISOString();
+    
+    // Create a new status history entry
+    const statusHistory = currentOrder.statusHistory || [];
+    statusHistory.push({
+      status: paymentStatus,
+      timestamp,
+      updatedBy: 'payment-system',
+      notes: paymentId ? `Payment ${paymentId} processed` : 'Payment status updated'
+    });
     
     const result = await ddbDocClient.send({
       TableName: ORDERS_TABLE,
       Key: { orderId },
-      UpdateExpression: 'set paymentStatus = :status, updatedAt = :timestamp, paymentId = :paymentId, paymentMethod = :paymentMethod',
+      UpdateExpression: 'set paymentStatus = :status, updatedAt = :timestamp, paymentId = :paymentId, paymentMethod = :paymentMethod, statusHistory = :statusHistory',
       ExpressionAttributeValues: {
         ':status': paymentStatus,
         ':timestamp': timestamp,
         ':paymentId': paymentId || null,
-        ':paymentMethod': paymentMethod || null
+        ':paymentMethod': paymentMethod || null,
+        ':statusHistory': statusHistory
       },
       ReturnValues: 'ALL_NEW'
     });

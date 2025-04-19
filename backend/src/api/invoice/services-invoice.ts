@@ -454,7 +454,6 @@ export async function generateInvoicePDF(invoiceData: InvoiceData): Promise<Uint
     size: 10,
     font: helveticaFont,
     color: black,
-    align: 'right',
   });
   
   yPos -= 15;
@@ -473,7 +472,6 @@ export async function generateInvoicePDF(invoiceData: InvoiceData): Promise<Uint
     size: 10,
     font: helveticaFont,
     color: black,
-    align: 'right',
   });
   
   yPos -= 15;
@@ -500,8 +498,7 @@ export async function generateInvoicePDF(invoiceData: InvoiceData): Promise<Uint
     y: yPos,
     size: 12,
     font: helveticaBold,
-    color: black,
-    align: 'right',
+    color: black
   });
   
   yPos -= 40;

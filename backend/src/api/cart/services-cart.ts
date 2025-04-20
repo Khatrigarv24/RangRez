@@ -45,8 +45,8 @@ export async function setupCartTable(): Promise<void> {
           { AttributeName: 'productId', AttributeType: 'S' }
         ],
         ProvisionedThroughput: {
-          ReadCapacityUnits: 5,
-          WriteCapacityUnits: 5,
+          ReadCapacityUnits: 1,
+          WriteCapacityUnits: 1,
         },
       })
     );

@@ -76,9 +76,3 @@ export function initCronJobs(): void {
     console.error('❌ Error in initial low stock check:', error);
   });
 }
-
-// Schedule the job to run every day at midnight
-cron.schedule('0 0 * * *', async () => {
-  console.log('Running scheduled job to delete old invoices...');
-  await deleteOldInvoices();
-});

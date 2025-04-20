@@ -15,19 +15,72 @@ const dbClient = new DynamoDBClient({
 
 const ddbDocClient = DynamoDBDocumentClient.from(dbClient);
 
+// Define table name as a constant
+const PRODUCTS_TABLE = 'products';
+
 // Function to Ensure Table Exists
 export async function connectDB(): Promise<void> {
   try {
     // Check if table already exists
     const listTables = await dbClient.send(new ListTablesCommand({}));
-    if (listTables.TableNames?.includes('products')) {
-      console.log("✅ table exists");
+    if (listTables.TableNames?.includes(PRODUCTS_TABLE)) {
+      console.log(`✅ Products table '${PRODUCTS_TABLE}' exists`);
       return;
     }
 
-    console.log("Table does not exist....");
+    console.log(`Creating products table '${PRODUCTS_TABLE}'...`);
+    
+    // Create the products table
+    await dbClient.send(
+      new CreateTableCommand({
+        TableName: PRODUCTS_TABLE,
+        KeySchema: [
+          { AttributeName: 'productId', KeyType: 'HASH' }
+        ],
+        AttributeDefinitions: [
+          { AttributeName: 'productId', AttributeType: 'S' },
+          { AttributeName: 'category', AttributeType: 'S' },
+          { AttributeName: 'createdAt', AttributeType: 'S' }
+        ],
+        GlobalSecondaryIndexes: [
+          {
+            IndexName: 'CategoryIndex',
+            KeySchema: [
+              { AttributeName: 'category', KeyType: 'HASH' }
+            ],
+            Projection: {
+              ProjectionType: 'ALL'
+            },
+            ProvisionedThroughput: {
+              ReadCapacityUnits: 1,
+              WriteCapacityUnits:1
+            }
+          },
+          {
+            IndexName: 'CreatedAtIndex',
+            KeySchema: [
+              { AttributeName: 'createdAt', KeyType: 'HASH' }
+            ],
+            Projection: {
+              ProjectionType: 'ALL'
+            },
+            ProvisionedThroughput: {
+              ReadCapacityUnits: 5,
+              WriteCapacityUnits: 5
+            }
+          }
+        ],
+        ProvisionedThroughput: {
+          ReadCapacityUnits: 5,
+          WriteCapacityUnits: 5,
+        },
+      })
+    );
+    
+    console.log(`✅ Created products table '${PRODUCTS_TABLE}'`);
   } catch (err) {
     console.error("❌ Error ensuring DynamoDB table:", err);
+    throw err;
   }
 }
 
@@ -43,7 +96,7 @@ export async function getLowStockProducts(threshold: number = 10): Promise<Array
   try {
     // Scan the products table with a filter for low stock
     const scanParams = {
-      TableName: 'products',
+      TableName: PRODUCTS_TABLE,
       FilterExpression: 'stock < :threshold',
       ExpressionAttributeValues: {
         ':threshold': threshold

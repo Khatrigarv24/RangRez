@@ -13,6 +13,7 @@ import { setupUsersTable } from './auth/services-auth';
 import { setupOrdersTable } from './checkout/services-checkout'; 
 import { adminProductRoutes } from './admin/routes-admin';
 import { tagRoutes } from './tag/routes-tag';// Import orders table setup
+import { initCronJobs } from './cran-jobs';
 
 const appRouter = new Hono();
 
@@ -22,7 +23,8 @@ setupInvoiceTable();
 setupCartTable();
 setupWishlistTable();
 setupUsersTable();
-setupOrdersTable(); // Set up orders table
+setupOrdersTable();
+// initCronJobs(); // Set up orders table
 
 // Use Routes
 appRouter.route('/', uploadRoutes);

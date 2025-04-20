@@ -12,8 +12,8 @@ const wishlistRoutes = new Hono();
 wishlistRoutes.use('*', cors());
 
 // Define Wishlist Routes
-wishlistRoutes.post('/api/wishlist', toggleWishlistItem);                   // Toggle item in wishlist
-wishlistRoutes.get('/api/wishlist/:userId', getUserWishlist);               // Get user's wishlist
-wishlistRoutes.delete('/api/wishlist/:userId/:productId', removeWishlistItem);  // Remove item from wishlist
+wishlistRoutes.post('/add', toggleWishlistItem);                   // Toggle item in wishlist
+wishlistRoutes.get('/:userId', getUserWishlist);               // Get user's wishlist
+wishlistRoutes.delete('/:userId/:productId', removeWishlistItem);  // Remove item from wishlist
 
 export { wishlistRoutes };

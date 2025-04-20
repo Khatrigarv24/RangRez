@@ -605,14 +605,14 @@ export async function setupInvoiceTable(): Promise<void> {
               ProjectionType: 'ALL'
             },
             ProvisionedThroughput: {
-              ReadCapacityUnits: 5,
-              WriteCapacityUnits: 5
+              ReadCapacityUnits: 1,
+              WriteCapacityUnits: 1
             }
           }
         ],
         ProvisionedThroughput: {
-          ReadCapacityUnits: 5,
-          WriteCapacityUnits: 5,
+          ReadCapacityUnits: 1,
+          WriteCapacityUnits: 1,
         },
       })
     );

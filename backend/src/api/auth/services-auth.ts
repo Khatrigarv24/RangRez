@@ -4,6 +4,7 @@ import { v4 as uuidv4 } from 'uuid';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import dotenv from 'dotenv';
+import { isAdmin } from '../admin/services-admin';
 
 dotenv.config();
 
@@ -61,8 +62,8 @@ export async function setupUsersTable(): Promise<void> {
               ProjectionType: 'ALL'
             },
             ProvisionedThroughput: {
-              ReadCapacityUnits: 5,
-              WriteCapacityUnits: 5
+              ReadCapacityUnits: 1,
+              WriteCapacityUnits: 1
             }
           },
           {
@@ -74,14 +75,14 @@ export async function setupUsersTable(): Promise<void> {
               ProjectionType: 'ALL'
             },
             ProvisionedThroughput: {
-              ReadCapacityUnits: 5,
-              WriteCapacityUnits: 5
+              ReadCapacityUnits: 1,
+              WriteCapacityUnits: 1
             }
           }
         ],
         ProvisionedThroughput: {
-          ReadCapacityUnits: 5,
-          WriteCapacityUnits: 5,
+          ReadCapacityUnits: 1,
+          WriteCapacityUnits: 1,
         },
       })
     );
@@ -94,6 +95,7 @@ export async function setupUsersTable(): Promise<void> {
 
 // Interface for user details
 export interface User {
+  isAdmin: boolean;
   userId: string;
   name?: string;
   email: string;
@@ -182,7 +184,8 @@ export async function registerUser(
     mobile,
     gstNumber,
     passwordHash,
-    createdAt: new Date().toISOString()
+    createdAt: new Date().toISOString(),
+    isAdmin: false // Add this property with a default value of false
   };
   
   // Save user to DynamoDB
@@ -247,7 +250,8 @@ export async function loginUser(emailOrMobile: string, password: string): Promis
         email: user.email,
         mobile: user.mobile,
         isB2B: user.isB2B || false,
-        isBlocked: user.isBlocked || false
+        isBlocked: user.isBlocked || false,
+        isAdmin: user.isAdmin || false
       },
       JWT_SECRET,
       { expiresIn: JWT_EXPIRES_IN }

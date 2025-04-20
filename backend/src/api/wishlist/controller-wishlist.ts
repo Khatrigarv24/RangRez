@@ -21,11 +21,11 @@ export const toggleWishlistItem = async (c: Context) => {
       }, 400);
     }
 
-    // Check if product exists
+    // Check if product exists in products table
     try {
       const productResult = await ddbDocClient.send(
         new GetCommand({
-          TableName: 'discts', // Using the existing products table
+          TableName: 'products', // Changed from 'wishlist-items' to 'products'
           Key: { productId }
         })
       );
@@ -95,10 +95,10 @@ export const getUserWishlist = async (c: Context) => {
     const wishlistItemsWithDetails = await Promise.all(
       wishlistItems.map(async (item) => {
         try {
-          // Get product details
+          // Get product details from products table
           const productResult = await ddbDocClient.send(
             new GetCommand({
-              TableName: 'discts',
+              TableName: 'products', // Changed from 'wishlist-items' to 'products'
               Key: { productId: item.productId }
             })
           );

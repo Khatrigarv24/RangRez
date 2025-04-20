@@ -44,11 +44,11 @@ export const getAllProducts = async (c: Context) => {
  */
 export const getProductById = async (c: Context) => {
   try {
-    const productId = c.req.param('id');
+    const id = c.req.param('id');
     
     const params = {
       TableName: "products",
-      Key: { id: productId }
+      Key: { productId: id }
     };
     
     const { Item } = await ddbDocClient.send(new GetCommand(params));

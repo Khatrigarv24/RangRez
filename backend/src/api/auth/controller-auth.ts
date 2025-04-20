@@ -8,6 +8,7 @@ import {
   isValidMobile,
   isValidGSTIN
 } from './services-auth';
+import { UpdateCommand } from '@aws-sdk/lib-dynamodb';
 
 // Register a new user
 export const register = async (c: Context) => {
@@ -123,6 +124,39 @@ export const login = async (c: Context) => {
     return c.json({
       success: false,
       error: "Login failed",
+      details: error.message
+    }, 500);
+  }
+};
+
+// Make user admin
+export const makeUserAdmin = async (c: Context, userId: string) => {
+  try {
+    const { ddbDocClient } = await import('../products/products-services');
+    const USERS_TABLE = process.env.USERS_TABLE || 'users';
+    
+    // Update user to have admin privileges
+    await ddbDocClient.send(
+      new UpdateCommand({
+        TableName: USERS_TABLE,
+        Key: { userId },
+        UpdateExpression: 'SET isAdmin = :isAdmin',
+        ExpressionAttributeValues: {
+          ':isAdmin': true
+        },
+        ReturnValues: 'ALL_NEW'
+      })
+    );
+    
+    return c.json({
+      success: true,
+      message: `User ${userId} has been given admin privileges`
+    });
+  } catch (error) {
+    console.error('❌ Error making user admin:', error);
+    return c.json({
+      success: false,
+      error: 'Failed to update user to admin',
       details: error.message
     }, 500);
   }

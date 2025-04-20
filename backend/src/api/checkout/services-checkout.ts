@@ -1,4 +1,4 @@
-import { DynamoDBDocumentClient, PutCommand, GetCommand, QueryCommand } from '@aws-sdk/lib-dynamodb';
+import { DynamoDBDocumentClient, PutCommand, GetCommand, QueryCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import { DynamoDBClient, CreateTableCommand, ListTablesCommand } from '@aws-sdk/client-dynamodb';
 import { v4 as uuidv4 } from 'uuid';
 import dotenv from 'dotenv';
@@ -44,14 +44,14 @@ export async function setupOrdersTable(): Promise<void> {
               ProjectionType: 'ALL'
             },
             ProvisionedThroughput: {
-              ReadCapacityUnits: 5,
-              WriteCapacityUnits: 5
+              ReadCapacityUnits: 1,
+              WriteCapacityUnits: 1
             }
           }
         ],
         ProvisionedThroughput: {
-          ReadCapacityUnits: 5,
-          WriteCapacityUnits: 5,
+          ReadCapacityUnits: 1,
+          WriteCapacityUnits: 1,
         },
       })
     );
@@ -277,7 +277,7 @@ export async function updateProductStock(products: OrderItem[]): Promise<void> {
       // Get current product stock
       const productResult = await ddbDocClient.send(
         new GetCommand({
-          TableName: 'discts',
+          TableName: 'product',
           Key: { productId: product.productId }
         })
       );
@@ -287,15 +287,17 @@ export async function updateProductStock(products: OrderItem[]): Promise<void> {
       if (currentProduct) {
         const newStock = Math.max(0, currentProduct.stock - product.quantity);
         
-        // Update the stock
-        await ddbDocClient.send({
-          TableName: 'discts',
-          Key: { productId: product.productId },
-          UpdateExpression: 'set stock = :stock',
-          ExpressionAttributeValues: {
-            ':stock': newStock
-          }
-        });
+        // Update the stock - FIX: Use UpdateCommand properly
+        await ddbDocClient.send(
+          new UpdateCommand({
+            TableName: 'discts',
+            Key: { productId: product.productId },
+            UpdateExpression: 'set stock = :stock',
+            ExpressionAttributeValues: {
+              ':stock': newStock
+            }
+          })
+        );
       }
     } catch (error) {
       console.error(`❌ Error updating stock for product ${product.productId}:`, error);
@@ -367,19 +369,22 @@ export async function updateOrderPaymentStatus(
       notes: paymentId ? `Payment ${paymentId} processed` : 'Payment status updated'
     });
     
-    const result = await ddbDocClient.send({
-      TableName: ORDERS_TABLE,
-      Key: { orderId },
-      UpdateExpression: 'set paymentStatus = :status, updatedAt = :timestamp, paymentId = :paymentId, paymentMethod = :paymentMethod, statusHistory = :statusHistory',
-      ExpressionAttributeValues: {
-        ':status': paymentStatus,
-        ':timestamp': timestamp,
-        ':paymentId': paymentId || null,
-        ':paymentMethod': paymentMethod || null,
-        ':statusHistory': statusHistory
-      },
-      ReturnValues: 'ALL_NEW'
-    });
+    // Use UpdateCommand constructor instead of direct object literal
+    const result = await ddbDocClient.send(
+      new UpdateCommand({
+        TableName: ORDERS_TABLE,
+        Key: { orderId },
+        UpdateExpression: 'set paymentStatus = :status, updatedAt = :timestamp, paymentId = :paymentId, paymentMethod = :paymentMethod, statusHistory = :statusHistory',
+        ExpressionAttributeValues: {
+          ':status': paymentStatus,
+          ':timestamp': timestamp,
+          ':paymentId': paymentId || null,
+          ':paymentMethod': paymentMethod || null,
+          ':statusHistory': statusHistory
+        },
+        ReturnValues: 'ALL_NEW'
+      })
+    );
     
     return result.Attributes as Order || null;
   } catch (error) {

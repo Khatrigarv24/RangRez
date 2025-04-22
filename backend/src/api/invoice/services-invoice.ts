@@ -4,6 +4,7 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { v4 as uuidv4 } from 'uuid';
 import dotenv from 'dotenv';
 import { DynamoDBClient, CreateTableCommand, ListTablesCommand } from '@aws-sdk/client-dynamodb';
+import { DynamoDBDocumentClient, PutCommand } from "@aws-sdk/lib-dynamodb";
 
 dotenv.config();
 
@@ -26,6 +27,9 @@ const dbClient = new DynamoDBClient({
     sessionToken: process.env.AWS_SESSION_TOKEN as string,
   },
 });
+
+// Create DynamoDB Document client
+const ddbDocClient = DynamoDBDocumentClient.from(dbClient);
 
 // S3 bucket name - you should add this to your .env file
 const BUCKET_NAME = process.env.AWS_S3_BUCKET_NAME || 'rangrez-uploads';
@@ -407,7 +411,7 @@ export async function generateInvoicePDF(invoiceData: InvoiceData): Promise<Uint
       color: black,
     });
     
-    page.drawText(`₹${formatCurrency(item.price)}`, {
+    page.drawText(`INR ${formatCurrency(item.price)}`, {
       x: col4X,
       y: yPos,
       size: 10,
@@ -415,7 +419,7 @@ export async function generateInvoicePDF(invoiceData: InvoiceData): Promise<Uint
       color: black,
     });
     
-    page.drawText(`₹${formatCurrency(item.subtotal)}`, {
+    page.drawText(`INR ${formatCurrency(item.subtotal)}`, {
       x: col5X,
       y: yPos,
       size: 10,
@@ -448,7 +452,7 @@ export async function generateInvoicePDF(invoiceData: InvoiceData): Promise<Uint
     color: black,
   });
   
-  page.drawText(`₹${formatCurrency(invoiceData.subtotal)}`, {
+  page.drawText(`INR ${formatCurrency(invoiceData.subtotal)}`, {
     x: summaryRightX - 70,
     y: yPos,
     size: 10,
@@ -466,7 +470,7 @@ export async function generateInvoicePDF(invoiceData: InvoiceData): Promise<Uint
     color: black,
   });
   
-  page.drawText(`₹${formatCurrency(invoiceData.gst)}`, {
+  page.drawText(`INR ${formatCurrency(invoiceData.gst)}`, {
     x: summaryRightX - 70,
     y: yPos,
     size: 10,
@@ -493,7 +497,7 @@ export async function generateInvoicePDF(invoiceData: InvoiceData): Promise<Uint
     color: black,
   });
   
-  page.drawText(`₹${formatCurrency(invoiceData.total)}`, {
+  page.drawText(`INR ${formatCurrency(invoiceData.total)}`, {
     x: summaryRightX - 70,
     y: yPos,
     size: 12,
@@ -620,6 +624,38 @@ export async function setupInvoiceTable(): Promise<void> {
     console.log(`✅ Created invoices table '${INVOICES_TABLE}'`);
   } catch (err) {
     console.error(`❌ Error ensuring invoices table:`, err);
+  }
+}
+
+/**
+ * Save invoice data to DynamoDB
+ */
+export async function saveInvoiceToDynamoDB(invoiceData: InvoiceData): Promise<void> {
+  try {
+    const timestamp = new Date().toISOString();
+    
+    await ddbDocClient.send(
+      new PutCommand({
+        TableName: INVOICES_TABLE,
+        Item: {
+          invoiceId: invoiceData.orderId,
+          customerId: invoiceData.customer.id,
+          customerName: invoiceData.customer.name,
+          customerEmail: invoiceData.customer.email,
+          orderDate: invoiceData.orderDate,
+          total: invoiceData.total,
+          status: invoiceData.paymentStatus,
+          createdAt: timestamp,
+          updatedAt: timestamp,
+          invoiceData: invoiceData // Store the complete invoice data for reference
+        }
+      })
+    );
+    
+    console.log(`✅ Saved invoice ${invoiceData.orderId} to DynamoDB`);
+  } catch (error) {
+    console.error('❌ Error saving invoice to DynamoDB:', error);
+    throw new Error('Failed to save invoice data');
   }
 }
 

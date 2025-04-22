@@ -135,8 +135,8 @@ export const getProductById = async (c: Context) => {
     const productId = c.req.param('id');
     
     const params = {
-      TableName: tableName,
-      Key: { id: productId }
+      TableName: tableName,  // Make sure tableName is 'products'
+      Key: { productId: productId }  // Changed from 'id' to 'productId'
     };
     
     const { Item } = await ddbDocClient.send(new GetCommand(params));
@@ -162,7 +162,9 @@ export const getProductById = async (c: Context) => {
         imageUrl: Item.imageUrl || Item.imageUrls?.[0] || '',
         imageUrls: Item.imageUrls || [],
         tags: Item.tags || [],
-        createdAt: Item.createdAt || ''
+        createdAt: Item.createdAt || '',
+        featured: Item.featured || false,
+        discount: Item.discount || 0
       }
     });
   } catch (error) {

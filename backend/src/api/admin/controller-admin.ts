@@ -171,7 +171,7 @@ export const updateProduct = async (c: Context) => {
     // Get current product to ensure it exists
     const getParams = {
       TableName: "products",
-      Key: { id: productId }
+      Key: { productId: productId }
     };
     
     const { Item } = await ddbDocClient.send(new GetCommand(getParams));
@@ -247,7 +247,7 @@ export const updateProduct = async (c: Context) => {
     // Execute update
     const updateParams = {
       TableName: "products",
-      Key: { id: productId },
+      Key: { productId: productId },
       UpdateExpression: `SET ${updateExpressions.join(', ')}`,
       ExpressionAttributeNames: expressionAttributeNames,
       ExpressionAttributeValues: expressionAttributeValues,
@@ -281,7 +281,7 @@ export const deleteProduct = async (c: Context) => {
     // Check if product exists
     const getParams = {
       TableName: "products",
-      Key: { id: productId }
+      Key: { productId: productId }
     };
     
     const { Item } = await ddbDocClient.send(new GetCommand(getParams));
@@ -296,7 +296,7 @@ export const deleteProduct = async (c: Context) => {
     // Delete the product
     const deleteParams = {
       TableName: "products",
-      Key: { id: productId }
+      Key: { productId: productId }
     };
     
     await ddbDocClient.send(new DeleteCommand(deleteParams));

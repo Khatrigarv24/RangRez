@@ -19,8 +19,8 @@ export const generateOrderInvoice = async (c: Context) => {
     // Fetch the order from DynamoDB
     const orderResult = await ddbDocClient.send(
       new GetCommand({
-        TableName: 'invoices', // Using existing invoice table
-        Key: { invoiceId: orderId }
+        TableName: 'orders', // Using existing invoice table
+        Key: { orderId: orderId }
       })
     );
     
@@ -33,6 +33,9 @@ export const generateOrderInvoice = async (c: Context) => {
     
     const order = orderResult.Item;
     
+    // Debug log order data
+    console.log('Order data from DB:', JSON.stringify(order, null, 2));
+    
     // Get additional user information if available
     let userData: any = null;
     
@@ -40,37 +43,48 @@ export const generateOrderInvoice = async (c: Context) => {
       userData = await getUserById(order.customerId);
     }
     
-    // Prepare invoice data
+    // Prepare invoice data with better default values
     const invoiceData: InvoiceData = {
-      orderId: order.invoiceId,
-      orderDate: order.createdAt,
+      orderId: order.invoiceId || order.orderId || 'INV-' + Date.now(),
+      orderDate: order.createdAt || new Date().toISOString(),
       customer: {
         id: order.customerId || 'guest',
-        name: order.customerName || '',
-        email: order.customerEmail || (userData?.email || ''),
-        phone: order.customerPhone || (userData?.mobile || ''),
-        gstNumber: userData?.gstNumber || '',
+        name: order.customerName || 'Guest Customer',
+        email: order.customerEmail || (userData?.email || 'No email provided'),
+        phone: order.customerPhone || (userData?.mobile || 'No phone provided'),
+        gstNumber: userData?.gstNumber || 'N/A',
       },
       billingAddress: {
-        street: order.customerAddress || (userData?.address || ''),
-        city: '',
-        state: '',
-        postalCode: '',
+        street: order.customerAddress || (userData?.address || 'Address not provided'),
+        city: order.customerCity || (userData?.city || 'City not provided'),
+        state: order.customerState || (userData?.state || 'State not provided'),
+        postalCode: order.customerPostalCode || (userData?.postalCode || 'Postal code not provided'),
         country: 'India',
       },
-      items: (order.items || []).map((item: any) => ({
-        name: item.name,
-        description: '', // Add description if available
-        quantity: item.quantity,
-        price: item.price,
-        subtotal: item.subtotal,
-      })),
+      items: Array.isArray(order.items) && order.items.length > 0 
+        ? order.items.map((item: any) => ({
+            name: item.name || 'Product',
+            description: item.description || '',
+            quantity: item.quantity || 1,
+            price: item.price || 0,
+            subtotal: item.subtotal || (item.price * item.quantity) || 0,
+          }))
+        : [{ 
+            name: 'Product', 
+            description: 'No product details available',
+            quantity: 1, 
+            price: order.total || 0, 
+            subtotal: order.total || 0 
+          }],
       subtotal: order.total || 0,
       gst: order.tax || 0,
-      total: order.grandTotal || 0,
+      total: order.grandTotal || order.total || 0,
       paymentMethod: order.paymentMethod || 'Cash',
       paymentStatus: order.status || 'paid',
     };
+    
+    // Debug log invoice data
+    console.log('Invoice data being sent to PDF generator:', JSON.stringify(invoiceData, null, 2));
     
     // Generate PDF
     const pdfBytes = await generateInvoicePDF(invoiceData);

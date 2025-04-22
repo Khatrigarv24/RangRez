@@ -143,7 +143,7 @@ export async function validateAndCalculateCart(userId: string): Promise<{
         // Get product details to verify availability and price
         const productResult = await ddbDocClient.send(
           new GetCommand({
-            TableName: 'discts', // Using the existing products table
+            TableName: 'products', // Using the existing products table
             Key: { productId: item.productId }
           })
         );
@@ -277,7 +277,7 @@ export async function updateProductStock(products: OrderItem[]): Promise<void> {
       // Get current product stock
       const productResult = await ddbDocClient.send(
         new GetCommand({
-          TableName: 'product',
+          TableName: 'products', // Change from 'product' to 'products' 
           Key: { productId: product.productId }
         })
       );
@@ -287,10 +287,10 @@ export async function updateProductStock(products: OrderItem[]): Promise<void> {
       if (currentProduct) {
         const newStock = Math.max(0, currentProduct.stock - product.quantity);
         
-        // Update the stock - FIX: Use UpdateCommand properly
+        // Update the stock
         await ddbDocClient.send(
           new UpdateCommand({
-            TableName: 'discts',
+            TableName: 'products', // Change from 'discts' to 'products'
             Key: { productId: product.productId },
             UpdateExpression: 'set stock = :stock',
             ExpressionAttributeValues: {

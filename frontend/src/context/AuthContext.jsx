@@ -1,0 +1,110 @@
+import React, { createContext, useState, useEffect, useContext } from 'react';
+import api from '../services/api'; // Use your configured API service
+
+const AuthContext = createContext();
+
+export const AuthProvider = ({ children }) => {
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      const userData = JSON.parse(localStorage.getItem('user'));
+      setUser(userData);
+    }
+    setLoading(false);
+  }, []);
+
+  const login = async (emailOrMobile, password) => {
+    try {
+      setLoading(true);
+      const response = await api.post('/auth/login', { 
+        emailOrMobile, 
+        password 
+      });
+      
+      if (response.data.success) {
+        const { token, user } = response.data;
+        localStorage.setItem('token', token);
+        localStorage.setItem('user', JSON.stringify(user));
+        setUser(user);
+        setError(null);
+        return true;
+      } else {
+        setError(response.data.error || 'Login failed');
+        return false;
+      }
+    } catch (err) {
+      setError(err.response?.data?.error || 'Login failed');
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const register = async (userData) => {
+    try {
+      setLoading(true);
+      const response = await api.post('/auth/register', userData);
+      
+      if (response.data.success) {
+        return true;
+      } else {
+        setError(response.data.error || 'Registration failed');
+        return false;
+      }
+    } catch (err) {
+      setError(err.response?.data?.error || 'Registration failed');
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const logout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    setUser(null);
+  };
+
+  const updateProfile = async (userId, updates) => {
+    try {
+      setLoading(true);
+      const response = await api.put(`/auth/user/${userId}`, updates);
+      
+      if (response.data.success) {
+        const updatedUser = response.data.user;
+        setUser(updatedUser);
+        localStorage.setItem('user', JSON.stringify(updatedUser));
+        return true;
+      } else {
+        setError(response.data.error || 'Profile update failed');
+        return false;
+      }
+    } catch (err) {
+      setError(err.response?.data?.error || 'Profile update failed');
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <AuthContext.Provider value={{ 
+      user, 
+      loading, 
+      error, 
+      login, 
+      register, 
+      logout,
+      updateProfile,
+      isAdmin: user?.isAdmin || false
+    }}>
+      {children}
+    </AuthContext.Provider>
+  );
+};
+
+export const useAuth = () => useContext(AuthContext);

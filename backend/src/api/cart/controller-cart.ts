@@ -34,8 +34,8 @@ export const addItemToCart = async (c: Context) => {
     try {
       const productResult = await ddbDocClient.send(
         new GetCommand({
-          TableName: 'discts', // Using the existing products table
-          Key: { productId }
+          TableName: 'products',
+          Key: { productId: productId } // Changed from 'id' to 'productId' as the primary key
         })
       );
 
@@ -94,11 +94,11 @@ export const getUserCart = async (c: Context) => {
     const cartItemsWithDetails = await Promise.all(
       cartItems.map(async (item) => {
         try {
-          // Get product details
+          // Get product details from the products table, not cart-items
           const productResult = await ddbDocClient.send(
             new GetCommand({
-              TableName: 'discts',
-              Key: { productId: item.productId }
+              TableName: 'products',
+              Key: { productId: item.productId } // Changed from 'id' to 'productId'
             })
           );
           
